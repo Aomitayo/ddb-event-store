@@ -98,7 +98,8 @@ module.exports = ({ tableName, ddbClient }) => ({
             SK: `#${aggregateTypeName}#${aggregateId}#${nextAggregateVersion}#${eventIndex}`,
             GSI1PK: `${aggregateTypeName}#${aggregateId}`,
             GSI1SK: `${eventName}#${eventTime || new Date().toISOString()}`,
-            version: nextAggregateVersion,
+            __version: nextAggregateVersion,
+            __eventName: eventName,
             ...eventAttribs
           }
         }

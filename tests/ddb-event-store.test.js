@@ -2,11 +2,16 @@ const chai = require('chai')
 const expect = chai.expect
 const sinon = require('sinon')
 const sinonChai = require('sinon-chai')
+const chaiAsPromised = require('chai-as-promised')
+const chaiEach = require('chai-each')
+
 const {
   ddbAssertions
 } = require('./lib/ddb-test-utils')
 chai.use(ddbAssertions)
 chai.use(sinonChai)
+chai.use(chaiAsPromised)
+chai.use(chaiEach)
 
 const AwsMocker = require('aws-sdk-mock')
 const ddbEventStore = require('../src/index')
@@ -62,9 +67,15 @@ describe.only('ddb-event-store', function () {
 
     return eventStore.put(aggregateTypeName, aggregateId, 0, events)
       .then(record => {
-        expect(record).to.have.property('version')
-        expect(record).to.have.property('aggregateTypeName', aggregateTypeName)
-        expect(record).to.have.property('aggregateId', aggregateId)
+        expect(record).to.include({
+          version:1,
+          aggregateTypeName: aggregateTypeName,
+          aggregateId: aggregateId
+        });
+        expect(ddbClientTransactWriteStub).to.have.been.calledOnce
+        const transactItems = ddbClientTransactWriteStub.args[0][0].TransactItems;
+        expect(transactItems[0].Put.Item).to.have.property('aggregateTypeName', aggregateTypeName)
+        expect(transactItems.slice(1)).to.each.have.nested.property('Put.Item.__eventName')
       })
   })
 
