@@ -30,7 +30,8 @@
     "onchange": "^7.0.2",
     "pegjs": "^0.10.0",
     "sinon": "^9.0.2",
-    "sinon-chai": "^3.5.0"
+    "sinon-chai": "^3.5.0",
+    "ulid": "latest"
   },
   "standard": {
     "env": {
