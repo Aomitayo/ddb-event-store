@@ -18,6 +18,9 @@
     "url": "https://github.com/Aomitayo/ddb-event-store/issues"
   },
   "homepage": "https://github.com/Aomitayo/ddb-event-store#readme",
+  "dependencies": {
+    "ulid": "latest"
+  },
   "devDependencies": {
     "@aomitayo/openapi-editor": "^0.1.0",
     "aws-sdk": "^2.686.0",
@@ -30,8 +33,7 @@
     "onchange": "^7.0.2",
     "pegjs": "^0.10.0",
     "sinon": "^9.0.2",
-    "sinon-chai": "^3.5.0",
-    "ulid": "latest"
+    "sinon-chai": "^3.5.0"
   },
   "standard": {
     "env": {
