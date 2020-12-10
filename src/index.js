@@ -1,3 +1,4 @@
+const { ulid } = require("ulid");
 /**
  * This module provides an event store implemention on top of dynamodb.
  * The event store supports 2 operations:
@@ -62,11 +63,11 @@ module.exports = ({ tableName, ddbClient }) => ({
         //console.log('returned from db', items)
         return count > 0
           ? { aggregate: { ...(items.slice(-1)[0]), aggregateId }, events: items.slice(0, -1) }
-          : { aggregate: { version: 0, aggregateTypeName, aggregateId }, events: [] }
+          : { aggregate: { version: ulid(), aggregateTypeName, aggregateId }, events: [] }
       })
   },
   put: (aggregateTypeName, aggregateId, currentAggregateVersion, events) => {
-    const nextAggregateVersion = currentAggregateVersion + 1
+    const nextAggregateVersion = ulid();
     const transactItems = ([
       {
         Put: {

@@ -18,6 +18,9 @@
     "url": "https://github.com/Aomitayo/ddb-event-store/issues"
   },
   "homepage": "https://github.com/Aomitayo/ddb-event-store#readme",
+  "dependencies": {
+    "ulid": "latest"
+  },
   "devDependencies": {
     "@aomitayo/openapi-editor": "^0.1.0",
     "aws-sdk": "^2.686.0",
