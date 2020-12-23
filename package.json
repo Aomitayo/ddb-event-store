@@ -1,6 +1,6 @@
 {
   "name": "ddb-event-store",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "An implementation of an eventstore on dynamodb",
   "main": "src/index.js",
   "scripts": {
