@@ -47,6 +47,8 @@
  *  GSI1SK: ``<event time>#<eventName>``
  *
  */
+const { ulid } = require("ulid");
+
 module.exports = ({ tableName, ddbClient }) => ({
   get: async (aggregateTypeName, aggregateId) => {
     return ddbClient.query({
@@ -62,11 +64,12 @@ module.exports = ({ tableName, ddbClient }) => ({
         //console.log('returned from db', items)
         return count > 0
           ? { aggregate: { ...(items.slice(-1)[0]), aggregateId }, events: items.slice(0, -1) }
-          : { aggregate: { version: 0, aggregateTypeName, aggregateId }, events: [] }
+          : { aggregate: { version: 0, versionUlid: ulid(0), aggregateTypeName, aggregateId }, events: [] }
       })
   },
   put: (aggregateTypeName, aggregateId, currentAggregateVersion, events) => {
     const nextAggregateVersion = currentAggregateVersion + 1
+    const nextAggregateVersionUlid = ulid(nextAggregateVersion);
     const transactItems = ([
       {
         Put: {
@@ -75,9 +78,10 @@ module.exports = ({ tableName, ddbClient }) => ({
           Item: {
             'PK': `${aggregateTypeName}#${aggregateId}`,
             'SK': `${aggregateTypeName}#${aggregateId}`,
-            aggregateTypeName: aggregateTypeName,
+            __aggregateTypeName: aggregateTypeName,
             aggregateId: aggregateId,
             version: nextAggregateVersion,
+            versionUlid: nextAggregateVersionUlid,
             lastUpdate: new Date().toISOString()
           },
           UpdateExpression: {
@@ -95,10 +99,11 @@ module.exports = ({ tableName, ddbClient }) => ({
           TableName: tableName,
           Item: {
             PK: `${aggregateTypeName}#${aggregateId}`,
-            SK: `#${aggregateTypeName}#${aggregateId}#${nextAggregateVersion}#${eventIndex}`,
+            SK: `#${aggregateTypeName}#${aggregateId}#${nextAggregateVersionUlid}#${eventIndex}`,
             GSI1PK: `${aggregateTypeName}#${aggregateId}`,
             GSI1SK: `${eventName}#${eventTime || new Date().toISOString()}`,
             __version: nextAggregateVersion,
+            __versionUlid: nextAggregateVersionUlid,
             __eventName: eventName,
             ...eventAttribs
           }

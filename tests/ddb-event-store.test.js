@@ -74,7 +74,7 @@ describe.only('ddb-event-store', function () {
         });
         expect(ddbClientTransactWriteStub).to.have.been.calledOnce
         const transactItems = ddbClientTransactWriteStub.args[0][0].TransactItems;
-        expect(transactItems[0].Put.Item).to.have.property('aggregateTypeName', aggregateTypeName)
+        expect(transactItems[0]).to.have.nested.property('Put.Item.__aggregateTypeName', aggregateTypeName)
         expect(transactItems.slice(1)).to.each.have.nested.property('Put.Item.__eventName')
       })
   })
