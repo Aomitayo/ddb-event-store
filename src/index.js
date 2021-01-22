@@ -49,6 +49,32 @@
  */
 const { ulid } = require("ulid");
 
+function executeTransactWrite(ddbClient, params) {
+  const transactionRequest = ddbClient.transactWrite(params);
+  let cancellationReasons;
+  transactionRequest.on("extractError", (response) => {
+    try {
+      cancellationReasons = JSON.parse(response.httpResponse.body.toString())
+        .CancellationReasons;
+    } catch (err) {
+      // suppress this just in case some types of errors aren't JSON parseable
+      console.error("Error extracting cancellation error", err);
+    }
+  });
+  return new Promise((resolve, reject) => {
+    transactionRequest.send((err, response) => {
+      if (err) {
+        console.error("Error performing transactWrite", {
+          cancellationReasons: JSON.stringify(cancellationReasons, null, 2),
+          err,
+        });
+        return reject(err);
+      }
+      return resolve(response);
+    });
+  });
+}
+
 module.exports = ({ tableName, ddbClient }) => ({
   get: async (aggregateTypeName, aggregateId) => {
     return ddbClient.query({
@@ -111,9 +137,12 @@ module.exports = ({ tableName, ddbClient }) => ({
       }
     }))
 
-    return ddbClient.transactWrite({
-      TransactItems: transactItems
-    }).promise()
-      .then(() => ({ version: nextAggregateVersion, aggregateId: aggregateId, aggregateTypeName: aggregateTypeName }))
-  }
-})
+    return executeTransactWrite(ddbClient, {
+      TransactItems: transactItems,
+    }).then(() => ({
+      version: nextAggregateVersion,
+      aggregateId: aggregateId,
+      aggregateTypeName: aggregateTypeName,
+    }));
+  },
+});
