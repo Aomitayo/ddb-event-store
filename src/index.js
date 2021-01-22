@@ -49,71 +49,114 @@
  */
 const { ulid } = require("ulid");
 
+function executeTransactWrite(ddbClient, params) {
+  const transactionRequest = ddbClient.transactWrite(params);
+  let cancellationReasons;
+  transactionRequest.on("extractError", (response) => {
+    try {
+      cancellationReasons = JSON.parse(response.httpResponse.body.toString())
+        .CancellationReasons;
+    } catch (err) {
+      // suppress this just in case some types of errors aren't JSON parseable
+      console.error("Error extracting cancellation error", err);
+    }
+  });
+  return new Promise((resolve, reject) => {
+    transactionRequest.send((err, response) => {
+      if (err) {
+        console.error("Error performing transactWrite", {
+          cancellationReasons: JSON.stringify(cancellationReasons, null, 2),
+          err,
+        });
+        return reject(err);
+      }
+      return resolve(response);
+    });
+  });
+}
+
 module.exports = ({ tableName, ddbClient }) => ({
   get: async (aggregateTypeName, aggregateId) => {
-    return ddbClient.query({
-      TableName: tableName,
-      KeyConditionExpression: 'PK = :pk and SK <= :sk',
-      ExpressionAttributeValues: {
-        ':pk': `${aggregateTypeName}#${aggregateId}`,
-        ':sk': `${aggregateTypeName}#${aggregateId}`
-      },
-      ScanIndexForward: true
-    }).promise()
+    return ddbClient
+      .query({
+        TableName: tableName,
+        KeyConditionExpression: "PK = :pk and SK <= :sk",
+        ExpressionAttributeValues: {
+          ":pk": `${aggregateTypeName}#${aggregateId}`,
+          ":sk": `${aggregateTypeName}#${aggregateId}`,
+        },
+        ScanIndexForward: true,
+      })
+      .promise()
       .then(({ Count: count, Items: items }) => {
         //console.log('returned from db', items)
         return count > 0
-          ? { aggregate: { ...(items.slice(-1)[0]), aggregateId }, events: items.slice(0, -1) }
-          : { aggregate: { version: 0, versionUlid: ulid(0), aggregateTypeName, aggregateId }, events: [] }
-      })
+          ? {
+              aggregate: { ...items.slice(-1)[0], aggregateId },
+              events: items.slice(0, -1),
+            }
+          : {
+              aggregate: {
+                version: 0,
+                versionUlid: ulid(0),
+                aggregateTypeName,
+                aggregateId,
+              },
+              events: [],
+            };
+      });
   },
   put: (aggregateTypeName, aggregateId, currentAggregateVersion, events) => {
-    const nextAggregateVersion = currentAggregateVersion + 1
+    const nextAggregateVersion = currentAggregateVersion + 1;
     const nextAggregateVersionUlid = ulid(nextAggregateVersion);
-    const transactItems = ([
+    const transactItems = [
       {
         Put: {
           TableName: tableName,
-          ConditionExpression: '(version = :currentVersion) or attribute_not_exists(SK)',
+          ConditionExpression:
+            "(version = :currentVersion) or attribute_not_exists(SK)",
           Item: {
-            'PK': `${aggregateTypeName}#${aggregateId}`,
-            'SK': `${aggregateTypeName}#${aggregateId}`,
+            PK: `${aggregateTypeName}#${aggregateId}`,
+            SK: `${aggregateTypeName}#${aggregateId}`,
             __aggregateTypeName: aggregateTypeName,
             aggregateId: aggregateId,
             version: nextAggregateVersion,
             versionUlid: nextAggregateVersionUlid,
-            lastUpdate: new Date().toISOString()
+            lastUpdate: new Date().toISOString(),
           },
-          UpdateExpression: {
-
-          },
+          UpdateExpression: {},
           ExpressionAttributeValues: {
-            ':currentVersion': currentAggregateVersion
+            ":currentVersion": currentAggregateVersion,
           },
-          ReturnValuesOnConditionCheckFailure: 'ALL_OLD'
-        }
-      }
-    ]).concat(events.map(({eventName, eventTime, ...eventAttribs}, eventIndex) => {
-      return {
-        Put: {
-          TableName: tableName,
-          Item: {
-            PK: `${aggregateTypeName}#${aggregateId}`,
-            SK: `#${aggregateTypeName}#${aggregateId}#${nextAggregateVersionUlid}#${eventIndex}`,
-            GSI1PK: `${aggregateTypeName}#${aggregateId}`,
-            GSI1SK: `${eventName}#${eventTime || new Date().toISOString()}`,
-            __version: nextAggregateVersion,
-            __versionUlid: nextAggregateVersionUlid,
-            __eventName: eventName,
-            ...eventAttribs
-          }
-        }
-      }
-    }))
+          ReturnValuesOnConditionCheckFailure: "ALL_OLD",
+        },
+      },
+    ].concat(
+      events.map(({ eventName, eventTime, ...eventAttribs }, eventIndex) => {
+        return {
+          Put: {
+            TableName: tableName,
+            Item: {
+              PK: `${aggregateTypeName}#${aggregateId}`,
+              SK: `#${aggregateTypeName}#${aggregateId}#${nextAggregateVersionUlid}#${eventIndex}`,
+              GSI1PK: `${aggregateTypeName}#${aggregateId}`,
+              GSI1SK: `${eventName}#${eventTime || new Date().toISOString()}`,
+              __version: nextAggregateVersion,
+              __versionUlid: nextAggregateVersionUlid,
+              __eventName: eventName,
+              ...eventAttribs,
+            },
+          },
+        };
+      })
+    );
 
-    return ddbClient.transactWrite({
-      TransactItems: transactItems
-    }).promise()
-      .then(() => ({ version: nextAggregateVersion, aggregateId: aggregateId, aggregateTypeName: aggregateTypeName }))
-  }
-})
+    return executeTransactWrite(ddbClient, {
+      TransactItems: transactItems,
+    }).then(() => ({
+      version: nextAggregateVersion,
+      aggregateId: aggregateId,
+      aggregateTypeName: aggregateTypeName,
+    }));
+  },
+});
