@@ -105,6 +105,7 @@ module.exports = ({ tableName, ddbClient }) => ({
             __version: nextAggregateVersion,
             __versionUlid: nextAggregateVersionUlid,
             __eventName: eventName,
+            eventName,
             ...eventAttribs
           }
         }
