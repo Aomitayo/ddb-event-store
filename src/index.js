@@ -49,9 +49,17 @@
  */
 const { ulid } = require("ulid");
 
+const aggregateResults = (aggregateTypeName, aggregateId) => 
+  ({ Count: count, Items: items }) => {
+    //console.log('returned from db', items)
+    return count > 0
+      ? { aggregate: { ...(items.slice(-1)[0]), aggregateId }, events: items.slice(0, -1) }
+      : { aggregate: { version: 0, versionUlid: ulid(0), aggregateTypeName, aggregateId }, events: [] }
+  }
+
 module.exports = ({ tableName, ddbClient }) => ({
   get: async (aggregateTypeName, aggregateId) => {
-    return ddbClient.query({
+    const query = ddbClient.query({
       TableName: tableName,
       KeyConditionExpression: 'PK = :pk and SK <= :sk',
       ExpressionAttributeValues: {
@@ -59,13 +67,12 @@ module.exports = ({ tableName, ddbClient }) => ({
         ':sk': `${aggregateTypeName}#${aggregateId}`
       },
       ScanIndexForward: true
-    }).promise()
-      .then(({ Count: count, Items: items }) => {
-        //console.log('returned from db', items)
-        return count > 0
-          ? { aggregate: { ...(items.slice(-1)[0]), aggregateId }, events: items.slice(0, -1) }
-          : { aggregate: { version: 0, versionUlid: ulid(0), aggregateTypeName, aggregateId }, events: [] }
-      })
+    });
+    if (typeof query.promise === 'function') {
+      return query.promise().then(aggregateResults(aggregateTypeName, aggregateId));
+    } else {
+      return query.then(aggregateResults(aggregateTypeName, aggregateId));
+    }
   },
   put: (aggregateTypeName, aggregateId, currentAggregateVersion, events) => {
     const nextAggregateVersion = currentAggregateVersion + 1
@@ -112,9 +119,14 @@ module.exports = ({ tableName, ddbClient }) => ({
       }
     }))
 
-    return ddbClient.transactWrite({
+    const query = ddbClient.transactWrite({
       TransactItems: transactItems
-    }).promise()
-      .then(() => ({ version: nextAggregateVersion, aggregateId: aggregateId, aggregateTypeName: aggregateTypeName }))
+    });
+    
+    if (typeof query.promise === 'function') {
+      return query.promise().then(() => ({ version: nextAggregateVersion, aggregateId: aggregateId, aggregateTypeName: aggregateTypeName }));
+    } else {
+      return query.then(() => ({ version: nextAggregateVersion, aggregateId: aggregateId, aggregateTypeName: aggregateTypeName }));
+    }
   }
 })
