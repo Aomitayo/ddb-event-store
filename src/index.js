@@ -57,14 +57,17 @@ const aggregateResults = (aggregateTypeName, aggregateId) =>
       : { aggregate: { version: 0, versionUlid: ulid(0), aggregateTypeName, aggregateId }, events: [] }
   }
 
-module.exports = ({ tableName, ddbClient }) => ({
+module.exports = ({ tableName, ddbClient, marshall }) => ({
   get: async (aggregateTypeName, aggregateId) => {
     const query = ddbClient.query({
       TableName: tableName,
       KeyConditionExpression: 'PK = :pk and SK <= :sk',
-      ExpressionAttributeValues: {
-        ':pk': { 'S': `${aggregateTypeName}#${aggregateId}` },
-        ':sk': { 'S': `${aggregateTypeName}#${aggregateId}` }
+      ExpressionAttributeValues: marshall ? marshall({
+        ':pk': `${aggregateTypeName}#${aggregateId}`,
+        ':sk': `${aggregateTypeName}#${aggregateId}`
+      }) : {
+        ':pk': `${aggregateTypeName}#${aggregateId}`,
+        ':sk': `${aggregateTypeName}#${aggregateId}`
       },
       ScanIndexForward: true
     });
@@ -82,7 +85,15 @@ module.exports = ({ tableName, ddbClient }) => ({
         Put: {
           TableName: tableName,
           ConditionExpression: '(version = :currentVersion) or attribute_not_exists(SK)',
-          Item: {
+          Item: marshall ? marshall({
+            'PK': `${aggregateTypeName}#${aggregateId}`,
+            'SK': `${aggregateTypeName}#${aggregateId}`,
+            __aggregateTypeName: aggregateTypeName,
+            aggregateId: aggregateId,
+            version: nextAggregateVersion,
+            versionUlid: nextAggregateVersionUlid,
+            lastUpdate: new Date().toISOString()
+          }) : {
             'PK': `${aggregateTypeName}#${aggregateId}`,
             'SK': `${aggregateTypeName}#${aggregateId}`,
             __aggregateTypeName: aggregateTypeName,
@@ -91,11 +102,10 @@ module.exports = ({ tableName, ddbClient }) => ({
             versionUlid: nextAggregateVersionUlid,
             lastUpdate: new Date().toISOString()
           },
-          UpdateExpression: {
-
-          },
-          ExpressionAttributeValues: {
-            ':currentVersion': { 'S': currentAggregateVersion }
+          ExpressionAttributeValues: marshall ? marshall({
+            ':currentVersion': `${currentAggregateVersion}`
+          }) : {
+            ':currentVersion': `${currentAggregateVersion}`
           },
           ReturnValuesOnConditionCheckFailure: 'ALL_OLD'
         }
@@ -104,7 +114,17 @@ module.exports = ({ tableName, ddbClient }) => ({
       return {
         Put: {
           TableName: tableName,
-          Item: {
+          Item: marshall ? marshall({
+            PK: `${aggregateTypeName}#${aggregateId}`,
+            SK: `#${aggregateTypeName}#${aggregateId}#${nextAggregateVersionUlid}#${eventIndex}`,
+            GSI1PK: `${aggregateTypeName}#${aggregateId}`,
+            GSI1SK: `${eventName}#${eventTime || new Date().toISOString()}`,
+            __version: nextAggregateVersion,
+            __versionUlid: nextAggregateVersionUlid,
+            __eventName: eventName,
+            eventName,
+            ...eventAttribs
+          }) : {
             PK: `${aggregateTypeName}#${aggregateId}`,
             SK: `#${aggregateTypeName}#${aggregateId}#${nextAggregateVersionUlid}#${eventIndex}`,
             GSI1PK: `${aggregateTypeName}#${aggregateId}`,
@@ -119,17 +139,9 @@ module.exports = ({ tableName, ddbClient }) => ({
       }
     }))
 
-    let query;
-
-    if (typeof ddbClient.transactWrite === 'function') {
-      query = ddbClient.transactWrite({
-        TransactItems: transactItems
-      });
-    } else {
-      query = ddbClient.transactWriteItems({
-        TransactItems: transactItems
-      });
-    }
+    const query = ddbClient.transactWriteItems({
+      TransactItems: transactItems
+    });
 
     if (typeof query.promise === 'function') {
       return query.promise().then(() => ({ version: nextAggregateVersion, aggregateId: aggregateId, aggregateTypeName: aggregateTypeName }));
