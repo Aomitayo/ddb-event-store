@@ -20,17 +20,17 @@
   "homepage": "https://github.com/Aomitayo/ddb-event-store#readme",
   "devDependencies": {
     "@aomitayo/openapi-editor": "^0.1.0",
-    "aws-sdk": "^2.686.0",
-    "aws-sdk-mock": "^5.1.0",
-    "chai": "^4.2.0",
+    "aws-sdk": "^2.1369.0",
+    "aws-sdk-mock": "^5.8.0",
+    "chai": "^4.3.7",
     "chai-as-promised": "^7.1.1",
     "chai-each": "0.0.1",
-    "dynamodb-local": "0.0.31",
+    "dynamodb-local": "0.0.32",
     "mocha": "^7.2.0",
-    "onchange": "^7.0.2",
+    "onchange": "^7.1.0",
     "pegjs": "^0.10.0",
     "sinon": "^9.0.2",
-    "sinon-chai": "^3.5.0"
+    "sinon-chai": "^3.7.0"
   },
   "standard": {
     "env": {

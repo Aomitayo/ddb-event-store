@@ -49,15 +49,20 @@
  */
 const { ulid } = require("ulid");
 
-const aggregateResults = (aggregateTypeName, aggregateId) => 
-  ({ Count: count, Items: items }) => {
-    //console.log('returned from db', items)
+const aggregateResults = (aggregateTypeName, aggregateId, unmarshall) => 
+  (result) => {
+    //console.log('returned from db', result)
+    const {Items, Count: count} = result;
+    let items;
+    unmarshall
+    ? items = Items.map(Item => unmarshall(Item))
+    : items = Items;
     return count > 0
       ? { aggregate: { ...(items.slice(-1)[0]), aggregateId }, events: items.slice(0, -1) }
       : { aggregate: { version: 0, versionUlid: ulid(0), aggregateTypeName, aggregateId }, events: [] }
   }
 
-module.exports = ({ tableName, ddbClient, marshall }) => ({
+module.exports = ({ tableName, ddbClient, marshall, unmarshall }) => ({
   get: async (aggregateTypeName, aggregateId) => {
     const query = ddbClient.query({
       TableName: tableName,
@@ -74,7 +79,7 @@ module.exports = ({ tableName, ddbClient, marshall }) => ({
     if (typeof query.promise === 'function') {
       return query.promise().then(aggregateResults(aggregateTypeName, aggregateId));
     } else {
-      return query.then(aggregateResults(aggregateTypeName, aggregateId));
+      return query.then(aggregateResults(aggregateTypeName, aggregateId, unmarshall));
     }
   },
   put: (aggregateTypeName, aggregateId, currentAggregateVersion, events) => {
@@ -103,9 +108,9 @@ module.exports = ({ tableName, ddbClient, marshall }) => ({
             lastUpdate: new Date().toISOString()
           },
           ExpressionAttributeValues: marshall ? marshall({
-            ':currentVersion': `${currentAggregateVersion}`
+            ':currentVersion': currentAggregateVersion
           }) : {
-            ':currentVersion': `${currentAggregateVersion}`
+            ':currentVersion': currentAggregateVersion
           },
           ReturnValuesOnConditionCheckFailure: 'ALL_OLD'
         }
@@ -139,9 +144,17 @@ module.exports = ({ tableName, ddbClient, marshall }) => ({
       }
     }))
 
-    const query = ddbClient.transactWriteItems({
-      TransactItems: transactItems
-    });
+    let query;
+
+    if (typeof ddbClient.transactWrite === 'function') {
+      query = ddbClient.transactWrite({
+        TransactItems: transactItems
+      });
+    } else {
+      query = ddbClient.transactWriteItems({
+        TransactItems: transactItems
+      });
+    }
 
     if (typeof query.promise === 'function') {
       return query.promise().then(() => ({ version: nextAggregateVersion, aggregateId: aggregateId, aggregateTypeName: aggregateTypeName }));
