@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "scripts": {
     "test": "mocha tests/**/*.test.js",
-    "dev": "onchange -i -k './src/**/*.js' 'tests/**/*.js' -- npm test"
+    "dev": "onchange -i -k './src/**/*.js' 'tests/**/*.js' -- npm test",
+    "prepare": "husky install"
   },
   "repository": {
     "type": "git",
@@ -26,6 +27,14 @@
     "chai-as-promised": "^7.1.1",
     "chai-each": "0.0.1",
     "dynamodb-local": "0.0.31",
+    "eslint": "^8.42.0",
+    "eslint-config-semistandard": "^17.0.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-n": "^15.7.0",
+    "eslint-plugin-promise": "^6.1.1",
+    "husky": "^8.0.0",
+    "lint-staged": "^13.2.2",
     "mocha": "^7.2.0",
     "onchange": "^7.0.2",
     "pegjs": "^0.10.0",
@@ -39,5 +48,8 @@
   },
   "dependencies": {
     "ulid": "^2.3.0"
+  },
+  "lint-staged": {
+    "*.js": "eslint --cache --fix"
   }
 }
