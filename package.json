@@ -20,7 +20,6 @@
   },
   "homepage": "https://github.com/Aomitayo/ddb-event-store#readme",
   "devDependencies": {
-    "@aomitayo/openapi-editor": "^0.1.0",
     "aws-sdk": "^2.686.0",
     "aws-sdk-mock": "^5.1.0",
     "chai": "^4.2.0",
